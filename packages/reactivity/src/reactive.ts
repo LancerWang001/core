@@ -87,11 +87,19 @@ export type UnwrapNestedRefs<T> = T extends Ref ? T : UnwrapRefSimple<T>
  * ```
  */
 export function reactive<T extends object>(target: T): UnwrapNestedRefs<T>
+/**
+ * @name reactive
+ * @description 将对象转为响应式对象
+ * @param {object} target 响应式数据源
+ * @returns {UnwrapNestedRefs} 响应式对象
+ */
 export function reactive(target: object) {
   // if trying to observe a readonly proxy, return the readonly version.
+  // 如果目标对象是 readonly 对象，直接返回
   if (isReadonly(target)) {
     return target
   }
+  // 调用 reateReactiveObject 创建响应式对象
   return createReactiveObject(
     target,
     false,
@@ -178,6 +186,16 @@ export function shallowReadonly<T extends object>(target: T): Readonly<T> {
   )
 }
 
+/**
+ * @name createReactiveObject
+ * @description 创建响应式对象的方法
+ * @param {Target} target 目标对象
+ * @param {boolean} isReadonly 是否是只读对象
+ * @param {ProxyHandler<any>} baseHandlers 处理 Set / Map / WeakSet / WeakMap 等数据的拦截器
+ * @param {ProxyHandler<any>} collectionHandlers 处理 Object / Array 的拦截器
+ * @param {WeakMap<Target, any>} proxyMap 存储响应式对象的映射，key 是目标对象，value 是响应式对象
+ * @returns {Proxy} 代理对象
+ */
 function createReactiveObject(
   target: Target,
   isReadonly: boolean,
@@ -185,14 +203,18 @@ function createReactiveObject(
   collectionHandlers: ProxyHandler<any>,
   proxyMap: WeakMap<Target, any>
 ) {
+  // 如果目标对象不是对象，则直接返回当前目标对象
   if (!isObject(target)) {
+    // 在开发环境提示警告信息
     if (__DEV__) {
       console.warn(`value cannot be made reactive: ${String(target)}`)
     }
+    // 直接返回目标对象
     return target
   }
   // target is already a Proxy, return it.
   // exception: calling readonly() on a reactive object
+  // 如果目标对象已经是响应式对象，则直接返回目标对象
   if (
     target[ReactiveFlags.RAW] &&
     !(isReadonly && target[ReactiveFlags.IS_REACTIVE])
@@ -200,20 +222,28 @@ function createReactiveObject(
     return target
   }
   // target already has corresponding Proxy
+  // 如果目标对象对应的响应式对象已经创建过，那么直接返回目标对象对应的响应式对象
   const existingProxy = proxyMap.get(target)
   if (existingProxy) {
     return existingProxy
   }
   // only a whitelist of value types can be observed.
+  // 如果目标对象不是白名单中的类型，则直接返回目标对象
+  // 白名单中的类型包括：对象、数组、Set、Map、WeakSet、WeakMap、添加了__v_skip标记的目标、不可扩展的对象（extensiable）
   const targetType = getTargetType(target)
   if (targetType === TargetType.INVALID) {
     return target
   }
+  // 创建 Proxy 对象劫持目标对象
   const proxy = new Proxy(
     target,
+    // 如果目标对象是 Object、Array，则使用 baseHandlers 进行拦截
+    // 如果目标对象是 Map、Set、WeakSet、WeakMap ，则使用 collectionHandlers 进行拦截
     targetType === TargetType.COLLECTION ? collectionHandlers : baseHandlers
   )
+  // 将响应式对象 proxy 存入 proxyMap 中保存起来
   proxyMap.set(target, proxy)
+  // 返回响应式对象 proxy
   return proxy
 }
 

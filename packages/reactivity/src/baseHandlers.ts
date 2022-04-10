@@ -81,13 +81,20 @@ function createArrayInstrumentations() {
 
 function createGetter(isReadonly = false, shallow = false) {
   return function get(target: Target, key: string | symbol, receiver: object) {
+    // 如果拦截到获取 __v_isReactive 属性，则返回 true
     if (key === ReactiveFlags.IS_REACTIVE) {
       return !isReadonly
-    } else if (key === ReactiveFlags.IS_READONLY) {
+    }
+    // 如果拦截到获取 __v_isReadonly 属性，返回 false
+    else if (key === ReactiveFlags.IS_READONLY) {
       return isReadonly
-    } else if (key === ReactiveFlags.IS_SHALLOW) {
+    }
+    // 如果拦截到获取 __v_isShallow 属性，返回 false
+    else if (key === ReactiveFlags.IS_SHALLOW) {
       return shallow
-    } else if (
+    }
+    // 如果拦截到获取 __v_raw 属性且目标对象对应 proxy 对象已经存在，则返回该目标对象
+    else if (
       key === ReactiveFlags.RAW &&
       receiver ===
         (isReadonly
@@ -103,38 +110,48 @@ function createGetter(isReadonly = false, shallow = false) {
     }
 
     const targetIsArray = isArray(target)
-
+    // 如果拦截到数组的指定方法，则将处理过后的数组方法返回
     if (!isReadonly && targetIsArray && hasOwn(arrayInstrumentations, key)) {
       return Reflect.get(arrayInstrumentations, key, receiver)
     }
 
+    // 通过 Reflect.get 获取目标对象上指定的属性
     const res = Reflect.get(target, key, receiver)
 
+    // 如果属性是内建 Symbol 或不可收集依赖的属性，例如：__proto__,__v_isRef,__isVue，则直接返回属性获取结果
     if (isSymbol(key) ? builtInSymbols.has(key) : isNonTrackableKeys(key)) {
       return res
     }
 
+    // 如果属性不是只读属性，则直接收集依赖
     if (!isReadonly) {
       track(target, TrackOpTypes.GET, key)
     }
 
+    // 如果目标对象是浅层响应式对象，则直接返回
     if (shallow) {
       return res
     }
 
+    // 如果属性值是 ref 对象，则返回 ref 对象的值
     if (isRef(res)) {
       // ref unwrapping - does not apply for Array + integer key.
       const shouldUnwrap = !targetIsArray || !isIntegerKey(key)
+      // 如果目标对象是数组且属性名是整数，则直接返回 ref 对象
+      // 否则返回 res.value
       return shouldUnwrap ? res.value : res
     }
 
+    // 如果属性值是对象，则将属性值转为响应式对象或只读数据
     if (isObject(res)) {
       // Convert returned value into a proxy as well. we do the isObject check
       // here to avoid invalid value warning. Also need to lazy access readonly
       // and reactive here to avoid circular dependency.
+      // 如果是只读属性，则将属性值包装为只读值返回
+      // 否则将属性值包装为响应式对象返回
       return isReadonly ? readonly(res) : reactive(res)
     }
-
+    // 返回属性值
     return res
   }
 }

@@ -682,6 +682,13 @@ function setupStatefulComponent(
   }
 }
 
+/**
+ * @name handleSetupResult
+ * @description
+ * @param instance 
+ * @param setupResult 
+ * @param isSSR 
+ */
 export function handleSetupResult(
   instance: ComponentInternalInstance,
   setupResult: unknown,
